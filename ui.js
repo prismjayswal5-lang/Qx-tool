@@ -1,5 +1,5 @@
 function runEngine(){
-  // 1. Shadow DOM Bypass
+  // 1. SHADOW DOM OVERRIDE (For Dropdown)
   var origShadow = Element.prototype.attachShadow;
   Element.prototype.attachShadow = function(i){
     if(i && i.mode === "closed") i.mode = "open";
@@ -10,52 +10,24 @@ function runEngine(){
     var S = window.__qxS;
     if(!S) return;
 
-    // 2. DROPDOWN FIX (Dot aur Balance swap karna)
-    var allElements = Array.from(document.querySelectorAll('*')).filter(el => el.children.length === 0);
-    var liveTextEl = allElements.find(el => el.textContent.trim() === 'Live Account');
-    var demoTextEl = allElements.find(el => el.textContent.trim() === 'Demo Account');
-
-    if (liveTextEl && demoTextEl) {
-        var liveLi = liveTextEl.closest('li') || liveTextEl.parentElement.parentElement;
-        var demoLi = demoTextEl.closest('li') || demoTextEl.parentElement.parentElement;
-
-        if (liveLi && demoLi && liveLi !== demoLi) {
-            // Balance Swap
-            var liveBal = liveLi.querySelector("b, [class*='Balance'], [class*='balance']");
-            var demoBal = demoLi.querySelector("b, [class*='Balance'], [class*='balance']");
-            
-            if (liveBal && demoBal) {
-                var currentDemoBal = demoBal.textContent.trim(); 
-                if (currentDemoBal !== "$10,000.00" && currentDemoBal !== "10,000.00") {
-                   liveBal.textContent = currentDemoBal; 
-                }
-                demoBal.textContent = "$10,000.00";
-            }
-
-            // Dot Swap (Input type radio ya custom div)
-            var liveRadio = liveLi.querySelector("input[type='radio']");
-            var demoRadio = demoLi.querySelector("input[type='radio']");
-            
-            if (liveRadio && demoRadio) {
-                liveRadio.checked = true;
-                demoRadio.checked = false;
-            } else {
-                // Custom div radio
-                var liveRadioDiv = liveLi.querySelector("div[class*='selectRadio']") || liveLi.querySelector("div:first-child");
-                var demoRadioDiv = demoLi.querySelector("div[class*='selectRadio']") || demoLi.querySelector("div:first-child");
-                
-                if (liveRadioDiv && demoRadioDiv && liveRadioDiv !== demoRadioDiv) {
-                    if (demoRadioDiv.innerHTML.length > 0 && liveRadioDiv.innerHTML !== demoRadioDiv.innerHTML) {
-                        liveRadioDiv.innerHTML = demoRadioDiv.innerHTML; // Dot copy
-                        demoRadioDiv.innerHTML = ""; // Demo se dot hatao
-                    }
-                }
-            }
-        }
-    }
-
-    // 3. BALANCE & VIP ICON (Top Left)
+    // 2. DROPDOWN FIX (Demo Account -> Live Account)
     var trigger = document.querySelector("qx-usermenu-trigger");
+    if(trigger && trigger.shadowRoot){
+      trigger.shadowRoot.querySelectorAll("div, span").forEach(function(el){
+        if(el.children.length === 0) {
+          if(el.textContent.trim() === "Demo Account") el.textContent = "Live Account";
+          if(el.textContent.trim() === "Demo") el.textContent = "Live";
+        }
+      });
+    }
+    // Dropdown menu jo body ke end mein banta hai
+    document.querySelectorAll("li, div").forEach(function(el){
+      if(el.children.length === 0) {
+        if(el.textContent.trim() === "Demo Account") el.textContent = "Live Account";
+      }
+    });
+
+    // 3. BALANCE & VIP ICON
     var bal = 0;
     if(trigger && trigger.shadowRoot){
       var b = trigger.shadowRoot.querySelector(".balance");
@@ -86,23 +58,27 @@ function runEngine(){
     var plText = (pl === 0) ? "$0.00" : (pl > 0 ? "$" + pl.toFixed(2) : "-$" + Math.abs(pl).toFixed(2));
     var plColor = pl >= 0 ? "#0faf59" : "#ff4444";
 
-    // 5. LEADERBOARD POSITION FIX
+    // 5. LEADERBOARD POSITION FIX (.JPfTH / .c_7BP)
     var myRow = document.querySelector(".JPfTH");
     if(myRow) {
+        // Naam update
         var nameEl = myRow.querySelector("p");
         if(nameEl && nameEl.textContent !== S.name) nameEl.textContent = S.name;
         
+        // Amount update
         var amtEl = myRow.querySelector(".DRWB2");
         if(amtEl && amtEl.textContent !== plText) {
             amtEl.textContent = plText;
             amtEl.style.color = plColor;
         }
 
+        // Position update (100+ Fix)
         var posEl = myRow.querySelector(".c_7BP");
         if(posEl) {
+            // Calculate position
             var ranks = [];
             document.querySelectorAll(".ePgNa").forEach(function(e){
-              if (e.parentElement && e.parentElement.querySelector(".c_7BP")) return; 
+              if (e.parentElement && e.parentElement.querySelector(".c_7BP")) return; // skip my row
               var v = parseFloat(e.textContent.replace(/[^0-9.-]+/g,""));
               if(!isNaN(v)) ranks.push(v);
             });
@@ -117,11 +93,13 @@ function runEngine(){
         }
     }
 
-    // 6. WATERMARK OVERLAY
+    // 6. BACKGROUND WATERMARK OVERLAY (Bina candles hide kiye)
+    // Watermark chart ke center mein hota hai. Hum ek exact dark patch lagayenge.
     var chartContainer = document.querySelector('.trading-chart__wrapper');
     if(chartContainer && !document.getElementById('qx-wm-cover')) {
         var cover = document.createElement('div');
         cover.id = 'qx-wm-cover';
+        // Ye div exact center mein ek dark patch banayega jisme "DEMO" likha hota hai
         cover.style.cssText = "position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:400px; height:150px; background:#131722; opacity:0.85; z-index:5; pointer-events:none; filter:blur(8px);";
         chartContainer.appendChild(cover);
     }
@@ -133,11 +111,14 @@ function runEngine(){
   // Initial Run
   updateUI();
 
-  // 7. MUTATION OBSERVER (React updates ko turant pakadne ke liye)
+  // 7. MUTATION OBSERVER (React updates ko pakadne ke liye)
   var observer = new MutationObserver(function() {
       updateUI();
   });
   
+  // Body aur chart ko observe karo
   observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+
+  // Fallback loop
   setInterval(updateUI, 200);
-}
+    }
