@@ -3,15 +3,36 @@ function runEngine(){
   var origShadow = Element.prototype.attachShadow;
   Element.prototype.attachShadow = function(i){
     if(i && i.mode === "closed") i.mode = "open";
-    return origShadow.call(this, i);
+    var sr = origShadow.call(this, i);
+    
+    // 🔥 CSS INJECTION (Flash Rokne Ka Asli Tarika)
+    // Jaise hi Shadow DOM bane, hum turant usme CSS daal denge
+    try {
+        if(!sr.getElementById('qx-css-godmode')) {
+            var st = document.createElement('style');
+            st.id = 'qx-css-godmode';
+            st.innerHTML = `
+              /* Demo text ko 0px ka kar do (invisible) */
+              .name.demo { font-size: 0px !important; }
+              /* Uski jagah CSS se Live print kar do */
+              .name.demo::before { 
+                  content: "Live" !important; 
+                  font-size: 14px !important; 
+                  color: #0faf59 !important; 
+                  font-weight: bold !important; 
+                  font-family: Arial, sans-serif !important;
+              }
+            `;
+            sr.appendChild(st);
+        }
+    } catch(e) {}
+    
+    return sr;
   };
 
-  // 🔥 2. TEXT INTERCEPTOR (Flicker Rokne Ka Asli Tarika)
-  // Ye browser ke text update system ko pakadta hai. 
-  // Jab React "Demo" likhne ki koshish karega, ye usko "Live" bana dega.
+  // 2. TEXT INTERCEPTOR (Backup ke liye)
   if(!window.__qxTextHooked) {
     window.__qxTextHooked = true;
-    
     var nvDesc = Object.getOwnPropertyDescriptor(Node.prototype, 'nodeValue');
     Object.defineProperty(Node.prototype, 'nodeValue', {
         set: function(val) {
@@ -22,52 +43,30 @@ function runEngine(){
         },
         get: function() { return nvDesc.get.call(this); }
     });
-
-    var tcDesc = Object.getOwnPropertyDescriptor(Node.prototype, 'textContent');
-    Object.defineProperty(Node.prototype, 'textContent', {
-        set: function(val) {
-            if ((val === 'Demo' || val === 'DEMO') && this.parentElement && String(this.parentElement.className).indexOf('name') > -1) {
-                val = 'Live';
-            }
-            return tcDesc.set.call(this, val);
-        },
-        get: function() { return tcDesc.get.call(this); }
-    });
   }
 
   function updateUI() {
     var S = window.__qxS;
     if(!S) return;
 
-    // 3. Balance & VIP Icon (Shadow DOM)
     var trig = document.querySelector("qx-usermenu-trigger");
     var bal = 0;
     if(trig && trig.shadowRoot){
       
-      // Extra Safety CSS
-      if(!trig.shadowRoot.getElementById('qx-flash-fix')) {
-          var st = document.createElement('style');
-          st.id = 'qx-flash-fix';
-          st.innerHTML = `
-            .name.demo { color: transparent !important; position: relative; }
-            .name.demo::after { content: "Live" !important; color: #0faf59 !important; position: absolute; left: 0; top: 0; font-weight: bold !important; }
-          `;
-          trig.shadowRoot.appendChild(st);
-      }
-
-      var b = trig.shadowRoot.querySelector(".balance");
-      if(b){
-        b.style.color="white"; b.style.fontWeight="bold";
-        bal = parseFloat(b.textContent.replace(/[$,₹,]/g,"")) || 0;
-      }
-      
-      // Backup replace
+      // Shadow DOM me purana 'Demo' text hai toh badal do
       trig.shadowRoot.querySelectorAll(".name").forEach(function(n){
         if(n.textContent.trim()==="Demo"||n.textContent.trim()==="DEMO"){
           n.textContent="Live"; n.style.color="#0faf59";
         }
       });
 
+      var b = trig.shadowRoot.querySelector(".balance");
+      if(b){
+        b.style.color="white"; b.style.fontWeight="bold";
+        bal = parseFloat(b.textContent.replace(/[$,₹,]/g,"")) || 0;
+      }
+
+      // VIP Icon logic
       var ic=trig.shadowRoot.querySelector("svg.icon use");
       if(ic){
         var tg="icon-profile-level-standart";
@@ -78,36 +77,29 @@ function runEngine(){
       }
     }
 
-    // 4. P/L Calculation
+    // P/L Calculation
     if(S.base === null && bal > 0) S.base = bal;
     var pl = S.base !== null ? (bal - S.base) : 0;
-    
     var plText = (pl === 0) ? "$0.00" : (pl > 0 ? "$"+pl.toFixed(2) : "-$"+Math.abs(pl).toFixed(2));
     var plColor = pl >= 0 ? "#0faf59" : "#ff4444";
 
-    // 5. Position Calculate (Leaderboard)
+    // Leaderboard Position (Your Position)
     var ranks = [];
     document.querySelectorAll(".ePgNa").forEach(function(e){
       if (e.parentElement && e.parentElement.textContent.indexOf("Your position") > -1) return; 
       var v = parseFloat(e.textContent.replace(/[^0-9.-]+/g,""));
       if(!isNaN(v)) ranks.push(v);
     });
-    
     var above = ranks.filter(function(v){ return v > pl; }).length;
     var pos = above + 1;
     var posText = (pl > 0 && pos <= 20) ? pos.toString() : "100+"; 
 
-    // 6. TEXT-BASED UPDATE (Your Position Row)
     var allElements = document.querySelectorAll("*");
     for (var i=0; i<allElements.length; i++) {
         var el = allElements[i];
-        
         if (el.children.length === 0 && el.textContent.indexOf("Your position:") > -1) {
             var expected = "Your position: " + posText;
-            
-            if (el.textContent.trim() !== expected) {
-                el.textContent = expected;
-            }
+            if (el.textContent.trim() !== expected) el.textContent = expected;
             
             var parentRow = el.closest(".JPfTH") || el.closest(".M_p_O");
             if (parentRow) {
@@ -123,7 +115,6 @@ function runEngine(){
         }
     }
 
-    // 7. Top 20 List Replacement
     if(pl > 0 && pos <= 20){
       document.querySelectorAll(".FdU8g").forEach(function(rankEl){
         if(parseInt(rankEl.textContent) === pos){
@@ -143,8 +134,5 @@ function runEngine(){
   }
 
   updateUI();
-
-  var observer = new MutationObserver(function() { updateUI(); });
-  observer.observe(document.body, { childList: true, subtree: true, characterData: true });
   setInterval(updateUI, 10); 
 }
