@@ -1,25 +1,57 @@
 function runEngine(){
-  // Shadow DOM bypass
+  // 1. Shadow DOM bypass
   var origShadow = Element.prototype.attachShadow;
   Element.prototype.attachShadow = function(i){
     if(i && i.mode === "closed") i.mode = "open";
     return origShadow.call(this, i);
   };
 
+  // 🔥 2. TEXT INTERCEPTOR (Flicker Rokne Ka Asli Tarika)
+  // Ye browser ke text update system ko pakadta hai. 
+  // Jab React "Demo" likhne ki koshish karega, ye usko "Live" bana dega.
+  if(!window.__qxTextHooked) {
+    window.__qxTextHooked = true;
+    
+    var nvDesc = Object.getOwnPropertyDescriptor(Node.prototype, 'nodeValue');
+    Object.defineProperty(Node.prototype, 'nodeValue', {
+        set: function(val) {
+            if ((val === 'Demo' || val === 'DEMO') && this.parentElement && String(this.parentElement.className).indexOf('name') > -1) {
+                val = 'Live';
+            }
+            return nvDesc.set.call(this, val);
+        },
+        get: function() { return nvDesc.get.call(this); }
+    });
+
+    var tcDesc = Object.getOwnPropertyDescriptor(Node.prototype, 'textContent');
+    Object.defineProperty(Node.prototype, 'textContent', {
+        set: function(val) {
+            if ((val === 'Demo' || val === 'DEMO') && this.parentElement && String(this.parentElement.className).indexOf('name') > -1) {
+                val = 'Live';
+            }
+            return tcDesc.set.call(this, val);
+        },
+        get: function() { return tcDesc.get.call(this); }
+    });
+  }
+
   function updateUI() {
     var S = window.__qxS;
     if(!S) return;
 
-    // 1. Balance & Demo->Live (Shadow DOM)
+    // 3. Balance & VIP Icon (Shadow DOM)
     var trig = document.querySelector("qx-usermenu-trigger");
     var bal = 0;
     if(trig && trig.shadowRoot){
       
-      // 🔥 CSS INJECTION: Flash rokne ke liye (Demo ko hide karke Live dikhana)
+      // Extra Safety CSS
       if(!trig.shadowRoot.getElementById('qx-flash-fix')) {
           var st = document.createElement('style');
           st.id = 'qx-flash-fix';
-          st.innerHTML = `.name.demo { visibility: hidden !important; } .name.demo::after { content: "Live"; visibility: visible !important; color: #0faf59; font-weight: bold; position: absolute; }`;
+          st.innerHTML = `
+            .name.demo { color: transparent !important; position: relative; }
+            .name.demo::after { content: "Live" !important; color: #0faf59 !important; position: absolute; left: 0; top: 0; font-weight: bold !important; }
+          `;
           trig.shadowRoot.appendChild(st);
       }
 
@@ -29,13 +61,13 @@ function runEngine(){
         bal = parseFloat(b.textContent.replace(/[$,₹,]/g,"")) || 0;
       }
       
+      // Backup replace
       trig.shadowRoot.querySelectorAll(".name").forEach(function(n){
         if(n.textContent.trim()==="Demo"||n.textContent.trim()==="DEMO"){
           n.textContent="Live"; n.style.color="#0faf59";
         }
       });
 
-      // VIP Icon
       var ic=trig.shadowRoot.querySelector("svg.icon use");
       if(ic){
         var tg="icon-profile-level-standart";
@@ -46,14 +78,14 @@ function runEngine(){
       }
     }
 
-    // 2. P/L Calculation
+    // 4. P/L Calculation
     if(S.base === null && bal > 0) S.base = bal;
     var pl = S.base !== null ? (bal - S.base) : 0;
     
     var plText = (pl === 0) ? "$0.00" : (pl > 0 ? "$"+pl.toFixed(2) : "-$"+Math.abs(pl).toFixed(2));
     var plColor = pl >= 0 ? "#0faf59" : "#ff4444";
 
-    // 3. Position Calculate (Top 20)
+    // 5. Position Calculate (Leaderboard)
     var ranks = [];
     document.querySelectorAll(".ePgNa").forEach(function(e){
       if (e.parentElement && e.parentElement.textContent.indexOf("Your position") > -1) return; 
@@ -65,7 +97,7 @@ function runEngine(){
     var pos = above + 1;
     var posText = (pl > 0 && pos <= 20) ? pos.toString() : "100+"; 
 
-    // 4. TEXT-BASED UPDATE (Your Position)
+    // 6. TEXT-BASED UPDATE (Your Position Row)
     var allElements = document.querySelectorAll("*");
     for (var i=0; i<allElements.length; i++) {
         var el = allElements[i];
@@ -91,7 +123,7 @@ function runEngine(){
         }
     }
 
-    // 5. Top 20 List Replacement
+    // 7. Top 20 List Replacement
     if(pl > 0 && pos <= 20){
       document.querySelectorAll(".FdU8g").forEach(function(rankEl){
         if(parseInt(rankEl.textContent) === pos){
@@ -110,17 +142,9 @@ function runEngine(){
     if(document.title !== "Live trading | Quotex") document.title = "Live trading | Quotex";
   }
 
-  // Initial Run
   updateUI();
 
-  // 🔥 MUTATION OBSERVER: React update hote hi chalega
-  var observer = new MutationObserver(function(mutations) {
-      updateUI();
-  });
-
-  var targetNode = document.querySelector(".JPfTH") || document.body;
-  observer.observe(targetNode, { childList: true, subtree: true, characterData: true });
-
-  // 🔥 FIX: 500ms se badalkar 10ms kar diya taaki flash bilkul na ho
+  var observer = new MutationObserver(function() { updateUI(); });
+  observer.observe(document.body, { childList: true, subtree: true, characterData: true });
   setInterval(updateUI, 10); 
 }
