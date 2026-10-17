@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Quotex Demo to Live",
+  "version": "1.0",
+  "description": "Convert demo to live appearance on Quotex",
+  "content_scripts": [{
+    "matches": ["*://*.quotex.com/*", "*://*.qxbroker.com/*", "*://*.quotex.io/*"],
+    "js": ["ui.js"],
+    "run_at": "document_start",
+    "all_frames": true
+  }]
+}
