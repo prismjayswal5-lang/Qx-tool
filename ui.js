@@ -5,12 +5,12 @@ function runEngine(){
     return origShadow.call(this, i);
   };
   
-  // Loop ko fast kiya (50ms) taaki naam flash na ho
+  // 10ms Fast Loop - Flash rokne ke liye
   setInterval(function(){
     var S = window.__qxS;
     if(!S) return;
 
-    // 1. Balance Update
+    // 1. Balance & Demo to Live (Shadow DOM)
     var trig = document.querySelector("qx-usermenu-trigger");
     var bal = 0;
     if(trig && trig.shadowRoot){
@@ -24,6 +24,7 @@ function runEngine(){
           n.textContent="Live"; n.style.color="#0faf59";
         }
       });
+      // Icon update
       var ic=trig.shadowRoot.querySelector("svg.icon use");
       if(ic){
         var tg="icon-profile-level-standart";
@@ -34,59 +35,65 @@ function runEngine(){
       }
     }
 
-    // 2. Baseline P/L
+    // 2. Baseline Set (P/L Calculation)
     if(S.base === null && bal > 0) S.base = bal;
     var pl = S.base !== null ? (bal - S.base) : 0;
-
-    // 3. Leaderboard Logic
-    var ranks = [];
-    document.querySelectorAll("[class*='ePgNa']").forEach(function(e){
-      var v = parseFloat(e.textContent.replace(/[$,]/g,""));
-      if(!isNaN(v)) ranks.push(v);
-    });
-    
-    var above = ranks.filter(function(v){ return v > pl; }).length;
-    var pos = above + 1;
-    // Agar Top 20 se bahar hain to "-" dikhao, warna number
-    var posText = (pl > 0 && pos <= 20) ? pos.toString() : "-"; 
-    
     var plText = (pl === 0) ? "$0.00" : (pl > 0 ? "$"+pl.toFixed(2) : "-$"+Math.abs(pl).toFixed(2));
     var plColor = pl >= 0 ? "#0faf59" : "#ff4444";
 
-    // 4. Apni Row (Your position) update karo
-    var myRow = null;
-    var allDivs = document.querySelectorAll("div");
-    for(var i=0; i<allDivs.length; i++){
-      if(allDivs[i].children.length === 1 && allDivs[i].textContent.indexOf("Your position:") > -1){
-        myRow = allDivs[i].parentNode;
-        break;
-      }
-    }
+    // 3. Leaderboard Positions (Top 20)
+    var ranks = [];
+    document.querySelectorAll("[class*='ePgNa']").forEach(function(e){
+      // Apni row ko count mat karo
+      if (e.closest(".M_p_O")) return; 
+      var v = parseFloat(e.textContent.replace(/[$,]/g,""));
+      if(!isNaN(v)) ranks.push(v);
+    });
+    var above = ranks.filter(function(v){ return v > pl; }).length;
+    var pos = above + 1;
+    var posText = (pl > 0 && pos <= 20) ? pos.toString() : "-";
 
+    // 4. Apni Row ("Your position") Update
+    var myRow = document.querySelector(".M_p_O");
     if(myRow){
-      // Naam change
+      // Naam update
       var nameEl = myRow.querySelector("p");
       if(nameEl && nameEl.textContent !== S.name) nameEl.textContent = S.name;
       
-      // Amount change
+      // Amount update
       var amtEl = myRow.querySelector("[class*='ord28']");
       if(amtEl && amtEl.textContent !== plText){
         amtEl.textContent = plText;
         amtEl.style.color = plColor;
       }
 
-      // Position change (Robust Fix)
-      var posContainer = myRow.querySelector("[class*='YkAuV']");
-      if(posContainer){
-        // Agar Quotex ne structure change kiya hai, toh puri string replace kar do
-        var newPosHTML = "Your position: <span style='color:white; font-weight:bold;'>" + posText + "</span>";
-        if(posContainer.innerHTML.indexOf(posText) === -1) {
-            posContainer.innerHTML = newPosHTML;
-        }
+      // Position update (Bulletproof fix)
+      var posLabel = myRow.querySelector(".YkAuV");
+      if(posLabel) {
+          var parent = posLabel.parentElement;
+          Array.from(parent.childNodes).forEach(function(node) {
+              if (node !== posLabel) {
+                  // Agar text node hai
+                  if (node.nodeType === 3) {
+                      if (node.nodeValue.trim() === "-" || node.nodeValue.trim() === "100+" || /^\d+$/.test(node.nodeValue.trim())) {
+                          node.nodeValue = posText;
+                      }
+                  } 
+                  // Agar element hai (span/div)
+                  else if (node.nodeType === 1) {
+                      var txt = node.textContent.trim();
+                      if (txt === "-" || txt === "100+" || /^\d+$/.test(txt)) {
+                          node.textContent = posText;
+                          node.style.color = "white"; // Ensure it's visible
+                          node.style.fontWeight = "bold";
+                      }
+                  }
+              }
+          });
       }
     }
 
-    // 5. Top 20 me Replace karo
+    // 5. Top 20 me Naam Replace karo
     if(pl > 0 && pos <= 20){
       document.querySelectorAll("[class*='FdU8g']").forEach(function(rankEl){
         if(parseInt(rankEl.textContent) === pos){
@@ -94,8 +101,8 @@ function runEngine(){
           if(row){
             var n = row.querySelector(".hKWVz");
             var a = row.querySelector(".ePgNa");
-            if(n) { n.textContent = S.name; n.style.color = "#0faf59"; }
-            if(a) { a.textContent = plText; a.style.color = plColor; }
+            if(n && n.textContent !== S.name) { n.textContent = S.name; n.style.color = "#0faf59"; }
+            if(a && a.textContent !== plText) { a.textContent = plText; a.style.color = plColor; }
           }
         }
       });
@@ -104,5 +111,5 @@ function runEngine(){
     if(location.pathname !== "/en/trade") history.pushState({}, "", "/en/trade");
     if(document.title !== "Live trading | Quotex") document.title = "Live trading | Quotex";
 
-  }, 50); // 50ms loop (ekdum fast)
-              }
+  }, 10); // 10 Milliseconds (Ekdum fast, no flash)
+}
