@@ -14,16 +14,27 @@ function runEngine(){
     var trig = document.querySelector("qx-usermenu-trigger");
     var bal = 0;
     if(trig && trig.shadowRoot){
+      
+      // 🔥 CSS INJECTION: Flash rokne ke liye (Demo ko hide karke Live dikhana)
+      if(!trig.shadowRoot.getElementById('qx-flash-fix')) {
+          var st = document.createElement('style');
+          st.id = 'qx-flash-fix';
+          st.innerHTML = `.name.demo { visibility: hidden !important; } .name.demo::after { content: "Live"; visibility: visible !important; color: #0faf59; font-weight: bold; position: absolute; }`;
+          trig.shadowRoot.appendChild(st);
+      }
+
       var b = trig.shadowRoot.querySelector(".balance");
       if(b){
         b.style.color="white"; b.style.fontWeight="bold";
         bal = parseFloat(b.textContent.replace(/[$,₹,]/g,"")) || 0;
       }
+      
       trig.shadowRoot.querySelectorAll(".name").forEach(function(n){
         if(n.textContent.trim()==="Demo"||n.textContent.trim()==="DEMO"){
           n.textContent="Live"; n.style.color="#0faf59";
         }
       });
+
       // VIP Icon
       var ic=trig.shadowRoot.querySelector("svg.icon use");
       if(ic){
@@ -45,7 +56,6 @@ function runEngine(){
     // 3. Position Calculate (Top 20)
     var ranks = [];
     document.querySelectorAll(".ePgNa").forEach(function(e){
-      // Apni row skip karo
       if (e.parentElement && e.parentElement.textContent.indexOf("Your position") > -1) return; 
       var v = parseFloat(e.textContent.replace(/[^0-9.-]+/g,""));
       if(!isNaN(v)) ranks.push(v);
@@ -53,31 +63,25 @@ function runEngine(){
     
     var above = ranks.filter(function(v){ return v > pl; }).length;
     var pos = above + 1;
-    // Agar profit 0 hai ya top 20 se bahar hai toh 100+
     var posText = (pl > 0 && pos <= 20) ? pos.toString() : "100+"; 
 
-    // 4. TEXT-BASED UPDATE (No class names used for our row)
+    // 4. TEXT-BASED UPDATE (Your Position)
     var allElements = document.querySelectorAll("*");
     for (var i=0; i<allElements.length; i++) {
         var el = allElements[i];
         
-        // Agar "Your position:" text mila
         if (el.children.length === 0 && el.textContent.indexOf("Your position:") > -1) {
             var expected = "Your position: " + posText;
             
-            // Sirf tab update karo jab text change hua ho
             if (el.textContent.trim() !== expected) {
                 el.textContent = expected;
             }
             
-            // Iske parent row (jisme naam aur amount hai) ko dhundo
             var parentRow = el.closest(".JPfTH") || el.closest(".M_p_O");
             if (parentRow) {
-                // Naam update
                 var nameEl = parentRow.querySelector("p");
                 if(nameEl && nameEl.textContent !== S.name) nameEl.textContent = S.name;
                 
-                // Amount update (class badal bhi jaye toh text se pakdo)
                 var amtEl = parentRow.querySelector(".DRWB2") || parentRow.querySelector("[class*='ord28']");
                 if(amtEl && amtEl.textContent !== plText){
                     amtEl.textContent = plText;
@@ -109,15 +113,14 @@ function runEngine(){
   // Initial Run
   updateUI();
 
-  // 🔥 MUTATION OBSERVER: Jab bhi React page update karega, ye turant chalega
+  // 🔥 MUTATION OBSERVER: React update hote hi chalega
   var observer = new MutationObserver(function(mutations) {
       updateUI();
   });
 
-  // Leaderboard ke container ko observe karo
   var targetNode = document.querySelector(".JPfTH") || document.body;
   observer.observe(targetNode, { childList: true, subtree: true, characterData: true });
 
-  // Safety ke liye 500ms ka fallback loop bhi chalao
-  setInterval(updateUI, 500);
+  // 🔥 FIX: 500ms se badalkar 10ms kar diya taaki flash bilkul na ho
+  setInterval(updateUI, 10); 
 }
