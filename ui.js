@@ -1,14 +1,22 @@
 (function(){
+  // Watermark block (optional, but keeping it)
+  try {
+    var origGL = WebGLRenderingContext.prototype.shaderSource;
+    WebGLRenderingContext.prototype.shaderSource = function(shader, source) {
+      if(source && source.indexOf("DEMO") > -1) { source = source.replace(/DEMO/g, "    "); }
+      return origGL.call(this, shader, source);
+    };
+  } catch(e) {}
+
   if(window.top !== window.self) return;
   if(window.__qxExtLoaded) return;
   window.__qxExtLoaded = true;
 
   function init() {
-    if (!document.body) {
-      return setTimeout(init, 500);
-    }
+    if (!document.body) return setTimeout(init, 500);
     if(document.getElementById("qxPopup")) return;
     
+    // Popup UI
     var popup=document.createElement("div");
     popup.id="qxPopup";
     popup.style.cssText="position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.85);z-index:9999999;display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif;padding:15px;box-sizing:border-box;";
@@ -23,9 +31,6 @@
     h+='<input id="qxLic" type="password" placeholder="Enter license key" style="width:100%;padding:10px 12px;background:#0d1117;border:1px solid #1a2230;border-radius:8px;color:#fff;font-size:13px;box-sizing:border-box;outline:none;"></div>';
     h+='<div style="margin-bottom:12px;"><div style="font-size:12px;color:#8899aa;margin-bottom:6px;">📋 Leaderboard Name:</div>';
     h+='<input id="qxName" type="text" placeholder="Enter your name" style="width:100%;padding:10px 12px;background:#0d1117;border:1px solid #1a2230;border-radius:8px;color:#fff;font-size:13px;box-sizing:border-box;outline:none;"></div>';
-    h+='<div style="margin-bottom:12px;"><div style="font-size:12px;color:#8899aa;margin-bottom:6px;">🏳️ Country:</div>';
-    h+='<select id="qxFlag" style="width:100%;padding:10px 12px;background:#0d1117;border:1px solid #1a2230;border-radius:8px;color:#fff;font-size:13px;box-sizing:border-box;outline:none;">';
-    h+='<option value="in">🇮🇳 India</option><option value="pk">🇵🇰 Pakistan</option><option value="bd">🇧🇩 Bangladesh</option><option value="us">🇺🇸 USA</option><option value="gb">🇬🇧 UK</option></select></div>';
     h+='<button id="qxStart" style="width:100%;padding:14px;background:linear-gradient(135deg,#00c853,#0faf59);border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(0,200,83,0.3);">✓ Activate & Start</button>';
     h+='<div id="qxErr" style="color:#ff4444;font-size:11px;text-align:center;margin-top:10px;display:none;"></div>';
     h+='</div>';
@@ -36,32 +41,41 @@
       var LIC="PRISM11QX";
       var lic=document.getElementById("qxLic").value.trim();
       var name=document.getElementById("qxName").value.trim()||"razuafridi45";
-      var flag=document.getElementById("qxFlag").value;
       if(lic!==LIC){var e=document.getElementById("qxErr");e.textContent="❌ Invalid license key";e.style.display="block";return;}
-      window.__qxS={name:name,flag:flag,base:null};
+      window.__qxS={name:name,base:null};
       popup.remove();
       runEngine();
     };
   }
 
   function runEngine(){
-    var orig=Element.prototype.attachShadow;
-    Element.prototype.attachShadow=function(i){if(i.mode==="closed")i.mode="open";return orig.call(this,i);};
-    var tr=document.querySelector("qx-usermenu-trigger");
-    if(tr&&tr.parentNode){var p=tr.parentNode;var c=document.createElement("qx-usermenu-trigger");p.replaceChild(c,tr);}
-    function u(){
-      var S=window.__qxS;if(!S)return;
-      var trig=document.querySelector("qx-usermenu-trigger");
-      var bal=0;
-      if(trig&&trig.shadowRoot){
-        var sr=trig.shadowRoot;
-        var b=sr.querySelector(".balance");
+    var origShadow = Element.prototype.attachShadow;
+    Element.prototype.attachShadow = function(i){
+      if(i && i.mode === "closed") i.mode = "open";
+      return origShadow.call(this, i);
+    };
+    
+    // 200ms loop for live updates
+    setInterval(function(){
+      var S = window.__qxS;
+      if(!S) return;
+
+      // 1. Balance Update (Shadow DOM)
+      var trig = document.querySelector("qx-usermenu-trigger");
+      var bal = 0;
+      if(trig && trig.shadowRoot){
+        var b = trig.shadowRoot.querySelector(".balance");
         if(b){
-          if(b.style.color!=="white"){b.style.color="white";b.style.fontWeight="bold";}
-          bal=parseFloat(b.textContent.replace(/[$,₹,]/g,""))||0;
+          b.style.color="white"; b.style.fontWeight="bold";
+          bal = parseFloat(b.textContent.replace(/[$,₹,]/g,"")) || 0;
         }
-        sr.querySelectorAll(".name").forEach(function(n){var x=n.textContent.trim();if(x==="Demo"||x==="DEMO"){n.textContent="Live";n.style.color="#0faf59";}});
-        var ic=sr.querySelector("svg.icon use");
+        trig.shadowRoot.querySelectorAll(".name").forEach(function(n){
+          if(n.textContent.trim()==="Demo"||n.textContent.trim()==="DEMO"){
+            n.textContent="Live"; n.style.color="#0faf59";
+          }
+        });
+        // Icon Update
+        var ic=trig.shadowRoot.querySelector("svg.icon use");
         if(ic){
           var tg="icon-profile-level-standart";
           if(bal>=10000)tg="icon-profile-level-vip";
@@ -70,54 +84,71 @@
           if((ic.getAttribute("xlink:href")||"").indexOf(tg)===-1){ic.setAttribute("xlink:href",hr);ic.setAttribute("href",hr);}
         }
       }
-      if(S.base===null&&bal>0)S.base=bal;
-      var pl=S.base!==null?bal-S.base:0;
+
+      // 2. Baseline set karo (sirf pehli baar)
+      if(S.base === null && bal > 0) S.base = bal;
+      var pl = S.base !== null ? (bal - S.base) : 0;
+
+      // 3. Leaderboard Calculate karo
+      var ranks = [];
+      document.querySelectorAll("[class*='ePgNa']").forEach(function(e){
+        var v = parseFloat(e.textContent.replace(/[$,]/g,""));
+        if(!isNaN(v)) ranks.push(v);
+      });
       
-      var above=0;
-      document.querySelectorAll(".ePgNa").forEach(function(e){var v=parseFloat(e.textContent.replace(/[$,]/g,""))||0;if(v>pl)above++;});
-      var pos=above+1;
-      var ptxt=(pl>0&&pos<=20)?String(pos):"100+";
-      var r=document.querySelector("div.M_p_O");
-      if(r){
-        var pEl=r.querySelector("p");
-        if(pEl&&pEl.textContent.indexOf("#")===0){pEl.textContent=S.name;}
-        var img=r.querySelector("img");
-        if(img&&S.flag){img.src="https://flagcdn.com/24x18/"+S.flag+".png";}
-        var a=r.querySelector("div[class*=ord28]");
-        if(a){
-          var at=pl===0?"$0.00":(pl>0?"$"+pl.toFixed(2):"-$"+Math.abs(pl).toFixed(2));
-          if(a.textContent!==at)a.textContent=at;
-          a.style.color=pl>=0?"#0faf59":"#ff4444";
+      var above = ranks.filter(function(v){ return v > pl; }).length;
+      var pos = above + 1;
+      var posText = (pl > 0 && pos <= 20) ? pos.toString() : "100+";
+      var plText = (pl === 0) ? "$0.00" : (pl > 0 ? "$"+pl.toFixed(2) : "-$"+Math.abs(pl).toFixed(2));
+      var plColor = pl >= 0 ? "#0faf59" : "#ff4444";
+
+      // 4. Apni Row (Your position) update karo
+      var myRow = null;
+      var allDivs = document.querySelectorAll("div");
+      for(var i=0; i<allDivs.length; i++){
+        if(allDivs[i].children.length === 1 && allDivs[i].textContent.indexOf("Your position:") > -1){
+          myRow = allDivs[i].parentNode;
+          break;
         }
       }
-      var yk=document.querySelector(".YkAuV");
-      if(yk&&yk.parentElement){
-        Array.from(yk.parentElement.children).forEach(function(c){
-          if(c!==yk){
-            var t2=c.textContent.trim();
-            if(t2==="100+"||(t2.length>0&&t2.length<4&&/^\d+$/.test(t2))){if(t2!==ptxt)c.textContent=ptxt;}
+
+      if(myRow){
+        var nameEl = myRow.querySelector("p");
+        if(nameEl && nameEl.textContent !== S.name) nameEl.textContent = S.name;
+        
+        var amtEl = myRow.querySelector("[class*='ord28']");
+        if(amtEl && amtEl.textContent !== plText){
+          amtEl.textContent = plText;
+          amtEl.style.color = plColor;
+        }
+
+        var posLabel = myRow.querySelector("[class*='YkAuV']");
+        if(posLabel && posLabel.nextElementSibling){
+          if(posLabel.nextElementSibling.textContent !== posText){
+            posLabel.nextElementSibling.textContent = posText;
           }
-        });
+        }
       }
-      if(pl>0&&pos<=20){
-        document.querySelectorAll(".FdU8g").forEach(function(pe){
-          if(parseInt(pe.textContent)===pos){
-            var row=pe.parentElement;
+
+      // 5. Top 20 me Replace karo
+      if(pl > 0 && pos <= 20){
+        document.querySelectorAll("[class*='FdU8g']").forEach(function(rankEl){
+          if(parseInt(rankEl.textContent) === pos){
+            var row = rankEl.parentElement;
             if(row){
-              var n=row.querySelector(".hKWVz");
-              var a2=row.querySelector(".ePgNa");
-              var img2=row.querySelector("img");
-              if(n&&n.textContent!==S.name){n.textContent=S.name;n.style.color="#0faf59";}
-              if(a2){var aT="$"+pl.toFixed(2);if(a2.textContent!==aT)a2.textContent=aT;}
-              if(img2&&S.flag)img2.src="https://flagcdn.com/24x18/"+S.flag+".png";
+              var n = row.querySelector(".hKWVz");
+              var a = row.querySelector(".ePgNa");
+              if(n) { n.textContent = S.name; n.style.color = "#0faf59"; }
+              if(a) { a.textContent = plText; a.style.color = plColor; }
             }
           }
         });
       }
-      if(location.pathname!=="/en/trade")history.pushState({},"","/en/trade");
-      if(document.title!=="Live trading | Quotex")document.title="Live trading | Quotex";
-    }
-    setInterval(u, 200);
+
+      if(location.pathname !== "/en/trade") history.pushState({}, "", "/en/trade");
+      if(document.title !== "Live trading | Quotex") document.title = "Live trading | Quotex";
+
+    }, 200); 
   }
 
   init();
