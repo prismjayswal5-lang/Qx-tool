@@ -1,12 +1,35 @@
 (function(){
-  // 1. Shadow DOM bypass (Page load hote hi)
+  // 🔥 1. SHADOW DOM HIJACK & CSS INJECTION (Flash Rokne Ka Asli Tarika)
   var origShadow = Element.prototype.attachShadow;
   Element.prototype.attachShadow = function(i){
     if(i && i.mode === "closed") i.mode = "open";
     var sr = origShadow.call(this, i);
-    observeShadow(sr);
+    applyShadowCSS(sr);
     return sr;
   };
+
+  function applyShadowCSS(sr) {
+    try {
+      if(sr && !sr.getElementById('qx-css-godmode')) {
+        var st = document.createElement('style');
+        st.id = 'qx-css-godmode';
+        // CSS Engine directly "Demo" ko invisible karke "Live" paint karega
+        st.innerHTML = `
+          .name.demo { font-size: 0px !important; }
+          .name.demo::before { 
+              content: "Live" !important; 
+              font-size: 14px !important; 
+              color: #0faf59 !important; 
+              font-weight: bold !important; 
+              font-family: Arial, sans-serif !important;
+          }
+          .name { color: transparent !important; position: relative; }
+          .name::after { content: "Live" !important; color: #0faf59 !important; position: absolute; left: 0; top: 0; font-weight: bold; font-size: 14px; }
+        `;
+        sr.appendChild(st);
+      }
+    } catch(e){}
+  }
 
   function init() {
     if (!document.body) return setTimeout(init, 500);
@@ -44,18 +67,10 @@
     };
   }
 
-  function fixContent(root) {
+  // 🔥 2. DROPDOWN INSTANT FIX (MutationObserver)
+  function fixDropdown(root) {
     if(!root || !root.querySelectorAll) return;
-    
-    // Header "Demo" fix
-    root.querySelectorAll(".name").forEach(function(n){
-      if(n.textContent.trim()==="Demo" || n.textContent.trim()==="DEMO"){
-        n.textContent = "Live";
-        n.style.color = "#0faf59";
-      }
-    });
-
-    // Dropdown "Demo Account" fix
+    // Turant text badlo bina delay ke
     var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
     var demoNodes = [];
     var n;
@@ -68,7 +83,6 @@
     if(demoNodes.length >= 2){
         if(demoNodes[0].nodeValue !== "Live Account"){
             demoNodes[0].nodeValue = "Live Account";
-            
             var bottomRow = demoNodes[1].parentElement.closest('li') || demoNodes[1].parentElement.parentElement;
             if(bottomRow){
                 var balEl = Array.from(bottomRow.querySelectorAll('*')).find(el => el.textContent.includes('$') && el.children.length === 0);
@@ -78,26 +92,14 @@
     }
   }
 
-  function observeShadow(sr) {
-    if(!sr || sr.__observed) return;
-    sr.__observed = true;
-    fixContent(sr);
-    var observer = new MutationObserver(function() { fixContent(sr); });
-    observer.observe(sr, { childList: true, subtree: true, characterData: true });
-  }
-
-  function observeBody() {
-    if(document.body.__observed) return;
-    document.body.__observed = true;
-    fixContent(document.body);
-    var observer = new MutationObserver(function() { fixContent(document.body); });
-    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
-  }
-
   function runEngine(){
-    observeBody();
-    var trig = document.querySelector("qx-usermenu-trigger");
-    if(trig && trig.shadowRoot) observeShadow(trig.shadowRoot);
+    // Dropdown ke liye observer
+    var obs = new MutationObserver(function() { fixDropdown(document.body); });
+    obs.observe(document.body, { childList: true, subtree: true, characterData: true });
+    
+    // Agar shadow root pehle se bana hai toh usme CSS daalo
+    var existingTrig = document.querySelector("qx-usermenu-trigger");
+    if(existingTrig && existingTrig.shadowRoot) applyShadowCSS(existingTrig.shadowRoot);
 
     function updateUI() {
       var S = window.__qxS;
@@ -127,6 +129,7 @@
       var plText = (pl === 0) ? "$0.00" : (pl > 0 ? "$"+pl.toFixed(2) : "-$"+Math.abs(pl).toFixed(2));
       var plColor = pl >= 0 ? "#0faf59" : "#ff4444";
 
+      // Leaderboard Position
       var ranks = [];
       document.querySelectorAll(".ePgNa").forEach(function(e){
         if (e.parentElement && e.parentElement.textContent.indexOf("Your position") > -1) return; 
@@ -180,5 +183,6 @@
     setInterval(updateUI, 100); 
   }
 
+  // Start the whole process
   init();
 })();
